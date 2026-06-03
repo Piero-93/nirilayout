@@ -259,6 +259,7 @@ func activate(app *gtk.Application, layouts []Layout, startIndex int, err error)
 	gtk4layershell.SetLayer(&win.Window, gtk4layershell.LayerShellLayerOverlay)
 	gtk4layershell.SetKeyboardMode(&win.Window, gtk4layershell.LayerShellKeyboardModeExclusive)
 	gtk4layershell.SetMargin(&win.Window, gtk4layershell.LayerShellEdgeTop, 10)
+	gtk4layershell.SetNamespace(&win.Window, "nirilayout")
 
 	root := gtk.NewBox(gtk.OrientationVertical, 16)
 	win.SetChild(root)
