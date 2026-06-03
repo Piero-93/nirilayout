@@ -247,10 +247,28 @@ func main() {
 var stylesheet string
 
 func activate(app *gtk.Application, layouts []Layout, startIndex int, err error) {
+	// load default stylesheet
 	gtk.StyleContextAddProviderForDisplay(
 		gdk.DisplayGetDefault(), loadStylesheet(stylesheet),
 		gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
 	)
+
+	// load ~/.config/niri/nirilayout.css if it exists, to allow user overrides of the default stylesheet
+	configDir, configErr := getNiriConfigDir()
+	if configErr == nil {
+		userStylesheetPath := filepath.Join(configDir, "nirilayout.css")
+		if _, err := os.Stat(userStylesheetPath); err == nil {
+			content, err := os.ReadFile(userStylesheetPath)
+			if err != nil {
+				log.Printf("Error reading user stylesheet: %v", err)
+			} else {
+				gtk.StyleContextAddProviderForDisplay(
+					gdk.DisplayGetDefault(), loadStylesheet(string(content)),
+					gtk.STYLE_PROVIDER_PRIORITY_USER,
+				)
+			}
+		}
+	}
 
 	win := gtk.NewApplicationWindow(app)
 	win.SetTitle("nirilayout")
