@@ -24,7 +24,7 @@ release:
 changelog:
   sort: asc
   use: github
-  format: '{{ .SHA }}: {{ .Message }}{{ if not (eq .AuthorUsername "calico32") }} (@{{ .AuthorUsername }}){{ end }}'
+  format: '{{ .SHA }}: {{ .Message }}{{ if and (not (eq .AuthorUsername "calico32")) (not (eq .AuthorUsername "")) }} (@{{ .AuthorUsername }}){{ end }}'
   filters:
     exclude:
       - '^ci:'
