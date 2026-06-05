@@ -170,6 +170,10 @@ func applyBrightness(c color.RGBA, factor float64) color.RGBA {
 	}
 }
 
+func pickBorderColor(fill color.RGBA) color.RGBA {
+	return applyBrightness(fill, 1.2)
+}
+
 var lightTextColor = gray100
 var darkTextColor = gray900
 var lightTextLuminance = luminance(lightTextColor)

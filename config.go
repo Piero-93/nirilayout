@@ -73,26 +73,6 @@ func GatherLayouts(configDir string) ([]Layout, error) {
 			layout.Name = strings.TrimSuffix(strings.TrimPrefix(file.Name(), "layout_"), ".kdl")
 		}
 
-		outputs := make([]*Output, 0, len(layout.Outputs))
-		for _, output := range layout.Outputs {
-			if output.Off {
-				continue
-			}
-			if output.Modeline.DotClock == 0 && output.Mode == "" {
-				return nil, fmt.Errorf("%s: output %s: no mode or modeline defined, can't determine size (use //! mode to set a mode for this output)", file.Name(), output.Name)
-			}
-			if output.Mode != "" {
-				if !strings.Contains(output.Mode, "x") {
-					return nil, fmt.Errorf("%s: output %s: mode %q is not in the format WWWxHHH[@RR.RRR]", file.Name(), output.Name, output.Mode)
-				}
-			}
-			outputs = append(outputs, output)
-		}
-		slices.SortFunc(outputs, func(a, b *Output) int {
-			return strings.Compare(a.Name, b.Name)
-		})
-		layout.Outputs = outputs
-
 		layout.Path = filepath.Join(configDir, file.Name())
 		layouts = append(layouts, layout)
 	}
@@ -239,7 +219,25 @@ func parseLayoutFromConfig(filename string, niriConfig []byte) (layout Layout, e
 		return
 	}
 
+	if len(layout.Outputs) == 0 {
+		err = fmt.Errorf("%s: no outputs defined in layout", filename)
+		return
+	}
+
+	outputs := make([]*Output, 0, len(layout.Outputs))
 	for _, output := range layout.Outputs {
+		if output.Off {
+			continue
+		}
+		if output.Modeline.DotClock == 0 && output.Mode == "" {
+			return Layout{}, fmt.Errorf("output %s: no mode or modeline defined, can't determine size (use //! mode to set a mode for this output)", output.Name)
+		}
+		if output.Mode != "" {
+			if !strings.Contains(output.Mode, "x") {
+				return Layout{}, fmt.Errorf("output %s: mode %q is not in the format WWWxHHH[@RR.RRR]", output.Name, output.Mode)
+			}
+		}
+
 		name := output.Name
 		if output.NameOverride != "" {
 			name = output.NameOverride
@@ -249,7 +247,13 @@ func parseLayoutFromConfig(filename string, niriConfig []byte) (layout Layout, e
 			err = fmt.Errorf("%s: output %s: %w", filename, name, err)
 			return
 		}
+
+		outputs = append(outputs, output)
 	}
+	slices.SortFunc(outputs, func(a, b *Output) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	layout.Outputs = outputs
 
 	return
 }
@@ -330,7 +334,7 @@ func resolveOutputStyle(s outputStyleConfig, legacyColor *int, defaultStyle outp
 			_, style.borderColor = pickWindowColors(outputName)
 		} else {
 			// automatically pick a border color based on the fill color
-			style.borderColor = applyBrightness(style.fillColor, 1.2)
+			style.borderColor = pickBorderColor(style.fillColor)
 		}
 	default:
 		err = fmt.Errorf("expected string/int for border color, got %s", s.Border.Kind())
