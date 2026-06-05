@@ -79,19 +79,28 @@ func parseHexColor(s string) (color.RGBA, error) {
 		}
 		c.R, c.G, c.B = uint8(r*17), uint8(g*17), uint8(b*17)
 	case 7: // #RRGGBB
-		r, g, b := hexToByte(s[1])*16+hexToByte(s[2]), hexToByte(s[3])*16+hexToByte(s[4]), hexToByte(s[5])*16+hexToByte(s[6])
+		r, g, b := hexToBytePair(s[1], s[2]), hexToBytePair(s[3], s[4]), hexToBytePair(s[5], s[6])
 		if r < 0 || g < 0 || b < 0 {
 			return color.RGBA{}, fmt.Errorf("invalid hex digits in color: %q", s)
 		}
 		c.R, c.G, c.B = uint8(r), uint8(g), uint8(b)
 	case 9: // #RRGGBBAA
-		r, g, b, a := hexToByte(s[1])*16+hexToByte(s[2]), hexToByte(s[3])*16+hexToByte(s[4]), hexToByte(s[5])*16+hexToByte(s[6]), hexToByte(s[7])*16+hexToByte(s[8])
+		r, g, b, a := hexToBytePair(s[1], s[2]), hexToBytePair(s[3], s[4]), hexToBytePair(s[5], s[6]), hexToBytePair(s[7], s[8])
 		if r < 0 || g < 0 || b < 0 || a < 0 {
 			return color.RGBA{}, fmt.Errorf("invalid hex digits in color: %q", s)
 		}
 		c.R, c.G, c.B, c.A = uint8(r), uint8(g), uint8(b), uint8(a)
 	}
 	return c, nil
+}
+
+func hexToBytePair(high, low byte) int {
+	hi := hexToByte(high)
+	lo := hexToByte(low)
+	if hi < 0 || lo < 0 {
+		return -1
+	}
+	return hi*16 + lo
 }
 
 func hexToByte(b byte) int {
@@ -103,7 +112,7 @@ func hexToByte(b byte) int {
 	case 'A' <= b && b <= 'F':
 		return int(b - 'A' + 10)
 	}
-	return math.MinInt
+	return -1
 }
 
 func parseColorFunction(fnName string, args []string) (color.RGBA, error) {
@@ -137,8 +146,8 @@ func parseColorFunction(fnName string, args []string) (color.RGBA, error) {
 }
 
 func parseUint8(s string) (uint8, bool) {
-	i, err := strconv.ParseInt(s, 0, 64)
-	return uint8(i), err == nil && i >= 0 && i <= 255
+	u, err := strconv.ParseUint(s, 0, 8)
+	return uint8(u), err == nil
 }
 
 func clampUint8[T int | float64](v T) uint8 {
