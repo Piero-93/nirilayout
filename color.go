@@ -1,6 +1,210 @@
-package main
+package nirilayout
 
-import "image/color"
+import (
+	"fmt"
+	"hash/fnv"
+	"image/color"
+	"math"
+	"strconv"
+	"strings"
+)
+
+var fillColors = []color.RGBA{
+	gray600,
+	red700, orange700, amber700, yellow700,
+	lime700, green700, emerald700, teal700,
+	cyan700, sky700, blue700, indigo700,
+	violet700, purple700, fuchsia700, pink700,
+	rose700,
+}
+
+var borderColors = []color.RGBA{
+	gray400,
+	red500, orange500, amber500, yellow500,
+	lime500, green500, emerald500, teal500,
+	cyan500, sky500, blue500, indigo500,
+	violet500, purple500, fuchsia500, pink500,
+	rose500,
+}
+
+func pickWindowColors(name string) (fill, border color.RGBA) {
+	h := fnv.New32a()
+	h.Write([]byte(name))
+	index := int(h.Sum32()) % len(fillColors)
+	return fillColors[index], borderColors[index]
+}
+
+func rgba(color color.Color) (r, g, b, a float64) {
+	rw, gw, bw, aw := color.RGBA()
+	r = float64(rw) / 0xffff
+	g = float64(gw) / 0xffff
+	b = float64(bw) / 0xffff
+	a = float64(aw) / 0xffff
+	return
+}
+
+func parseColor(s string) (color.RGBA, error) {
+	if c, ok := colorNames[s]; ok {
+		return c, nil
+	}
+
+	if s[0] == '#' {
+		return parseHexColor(s)
+	}
+
+	fnName, argsStr, isFn := strings.Cut(s, "(")
+	if isFn {
+		argsStr, closed := strings.CutSuffix(argsStr, ")")
+		if !closed {
+			return color.RGBA{}, fmt.Errorf("invalid color function: missing closing parenthesis")
+		}
+		args := strings.Split(argsStr, ",")
+		for i := range args {
+			args[i] = strings.TrimSpace(args[i])
+		}
+
+		return parseColorFunction(fnName, args)
+	}
+
+	return color.RGBA{}, fmt.Errorf("unknown color format: %q", s)
+}
+
+func parseHexColor(s string) (color.RGBA, error) {
+	c := color.RGBA{A: 255}
+	switch len(s) {
+	case 4: // #RGB
+		r, g, b := hexToByte(s[1]), hexToByte(s[2]), hexToByte(s[3])
+		if r < 0 || g < 0 || b < 0 {
+			return color.RGBA{}, fmt.Errorf("invalid hex digits in color: %q", s)
+		}
+		c.R, c.G, c.B = uint8(r*17), uint8(g*17), uint8(b*17)
+	case 7: // #RRGGBB
+		r, g, b := hexToByte(s[1])*16+hexToByte(s[2]), hexToByte(s[3])*16+hexToByte(s[4]), hexToByte(s[5])*16+hexToByte(s[6])
+		if r < 0 || g < 0 || b < 0 {
+			return color.RGBA{}, fmt.Errorf("invalid hex digits in color: %q", s)
+		}
+		c.R, c.G, c.B = uint8(r), uint8(g), uint8(b)
+	case 9: // #RRGGBBAA
+		r, g, b, a := hexToByte(s[1])*16+hexToByte(s[2]), hexToByte(s[3])*16+hexToByte(s[4]), hexToByte(s[5])*16+hexToByte(s[6]), hexToByte(s[7])*16+hexToByte(s[8])
+		if r < 0 || g < 0 || b < 0 || a < 0 {
+			return color.RGBA{}, fmt.Errorf("invalid hex digits in color: %q", s)
+		}
+		c.R, c.G, c.B, c.A = uint8(r), uint8(g), uint8(b), uint8(a)
+	}
+	return c, nil
+}
+
+func hexToByte(b byte) int {
+	switch {
+	case '0' <= b && b <= '9':
+		return int(b - '0')
+	case 'a' <= b && b <= 'f':
+		return int(b - 'a' + 10)
+	case 'A' <= b && b <= 'F':
+		return int(b - 'A' + 10)
+	}
+	return math.MinInt
+}
+
+func parseColorFunction(fnName string, args []string) (color.RGBA, error) {
+	switch fnName {
+	case "rgb":
+		if len(args) != 3 {
+			return color.RGBA{}, fmt.Errorf("rgb() expects 3 arguments, got %d", len(args))
+		}
+		r, okr := parseUint8(args[0])
+		g, okg := parseUint8(args[1])
+		b, okb := parseUint8(args[2])
+		if !okr || !okg || !okb {
+			return color.RGBA{}, fmt.Errorf("invalid color components in rgb(): %v", args)
+		}
+		return color.RGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: 255}, nil
+	case "rgba":
+		if len(args) != 4 {
+			return color.RGBA{}, fmt.Errorf("rgba() expects 4 arguments, got %d", len(args))
+		}
+		r, okr := parseUint8(args[0])
+		g, okg := parseUint8(args[1])
+		b, okb := parseUint8(args[2])
+		a, oka := parseUint8(args[3])
+		if !okr || !okg || !okb || !oka {
+			return color.RGBA{}, fmt.Errorf("invalid color components in rgba(): %v", args)
+		}
+		return color.RGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: uint8(a)}, nil
+	}
+
+	return color.RGBA{}, fmt.Errorf("unknown color function: %q", fnName)
+}
+
+func parseUint8(s string) (uint8, bool) {
+	i, err := strconv.ParseInt(s, 0, 64)
+	return uint8(i), err == nil && i >= 0 && i <= 255
+}
+
+func clampUint8[T int | float64](v T) uint8 {
+	if v < 0 {
+		return 0
+	}
+	if v > 255 {
+		return 255
+	}
+
+	return uint8(v)
+}
+
+func applyBrightness(c color.RGBA, factor float64) color.RGBA {
+	return color.RGBA{
+		R: clampUint8(float64(c.R) * factor),
+		G: clampUint8(float64(c.G) * factor),
+		B: clampUint8(float64(c.B) * factor),
+		A: c.A,
+	}
+}
+
+var lightTextColor = gray100
+var darkTextColor = gray900
+var lightTextLuminance = luminance(lightTextColor)
+var darkTextLuminance = luminance(darkTextColor)
+
+// pickTextColor returns either lightTextColor or darkTextColor depending on
+// which has better contrast with the given background color (ignoring alpha).
+func pickTextColor(background color.RGBA) color.RGBA {
+	bg := luminance(background)
+	lightContrast := wcagContrast(bg, lightTextLuminance)
+	darkContrast := wcagContrast(bg, darkTextLuminance)
+	if lightContrast >= darkContrast {
+		return lightTextColor
+	}
+	return darkTextColor
+}
+
+// luminance returns the Y component of the color (ignoring alpha) in the XYZ
+// color space using the sRGB color space and D65 white point.
+func luminance(c color.RGBA) (y float64) {
+	// https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
+	nr, nb, ng := float64(c.R)/255, float64(c.B)/255, float64(c.G)/255
+	lr, lg, lb := linearize(nr), linearize(ng), linearize(nb)
+	y = 0.21263900587151027*lr + 0.715168678767756*lg + 0.07219231536073371*lb
+	return
+}
+
+// wcagContrast returns the WCAG 2.1 contrast ratio n:1 between two relative
+// luminance values.
+func wcagContrast(y1, y2 float64) float64 {
+	if y1 > y2 {
+		return (y1 + 0.05) / (y2 + 0.05)
+	}
+	return (y2 + 0.05) / (y1 + 0.05)
+}
+
+// linearize converts a normalized sRGB component [0..1] to a linear sRGB
+// component [0..1].
+func linearize(v float64) float64 {
+	if v <= 0.04045 {
+		return v / 12.92
+	}
+	return math.Pow((v+0.055)/1.055, 2.4)
+}
 
 // colors from Tailwind CSS v4.1.5 (MIT)
 // generated at https://colors.calebc.co
@@ -312,3 +516,269 @@ var (
 	rose900 = color.RGBA{139, 8, 54, 255}
 	rose950 = color.RGBA{77, 2, 24, 255}
 )
+
+var colorNames = map[string]color.RGBA{
+	"slate50":  slate50,
+	"slate100": slate100,
+	"slate200": slate200,
+	"slate300": slate300,
+	"slate400": slate400,
+	"slate500": slate500,
+	"slate600": slate600,
+	"slate700": slate700,
+	"slate800": slate800,
+	"slate900": slate900,
+	"slate950": slate950,
+
+	"gray50":  gray50,
+	"gray100": gray100,
+	"gray200": gray200,
+	"gray300": gray300,
+	"gray400": gray400,
+	"gray500": gray500,
+	"gray600": gray600,
+	"gray700": gray700,
+	"gray800": gray800,
+	"gray900": gray900,
+	"gray950": gray950,
+
+	"zinc50":  zinc50,
+	"zinc100": zinc100,
+	"zinc200": zinc200,
+	"zinc300": zinc300,
+	"zinc400": zinc400,
+	"zinc500": zinc500,
+	"zinc600": zinc600,
+	"zinc700": zinc700,
+	"zinc800": zinc800,
+	"zinc900": zinc900,
+	"zinc950": zinc950,
+
+	"neutral50":  neutral50,
+	"neutral100": neutral100,
+	"neutral200": neutral200,
+	"neutral300": neutral300,
+	"neutral400": neutral400,
+	"neutral500": neutral500,
+	"neutral600": neutral600,
+	"neutral700": neutral700,
+	"neutral800": neutral800,
+	"neutral900": neutral900,
+	"neutral950": neutral950,
+
+	"stone50":  stone50,
+	"stone100": stone100,
+	"stone200": stone200,
+	"stone300": stone300,
+	"stone400": stone400,
+	"stone500": stone500,
+	"stone600": stone600,
+	"stone700": stone700,
+	"stone800": stone800,
+	"stone900": stone900,
+	"stone950": stone950,
+
+	"red50":  red50,
+	"red100": red100,
+	"red200": red200,
+	"red300": red300,
+	"red400": red400,
+	"red500": red500,
+	"red600": red600,
+	"red700": red700,
+	"red800": red800,
+	"red900": red900,
+	"red950": red950,
+
+	"orange50":  orange50,
+	"orange100": orange100,
+	"orange200": orange200,
+	"orange300": orange300,
+	"orange400": orange400,
+	"orange500": orange500,
+	"orange600": orange600,
+	"orange700": orange700,
+	"orange800": orange800,
+	"orange900": orange900,
+	"orange950": orange950,
+
+	"amber50":  amber50,
+	"amber100": amber100,
+	"amber200": amber200,
+	"amber300": amber300,
+	"amber400": amber400,
+	"amber500": amber500,
+	"amber600": amber600,
+	"amber700": amber700,
+	"amber800": amber800,
+	"amber900": amber900,
+	"amber950": amber950,
+
+	"yellow50":  yellow50,
+	"yellow100": yellow100,
+	"yellow200": yellow200,
+	"yellow300": yellow300,
+	"yellow400": yellow400,
+	"yellow500": yellow500,
+	"yellow600": yellow600,
+	"yellow700": yellow700,
+	"yellow800": yellow800,
+	"yellow900": yellow900,
+	"yellow950": yellow950,
+
+	"lime50":  lime50,
+	"lime100": lime100,
+	"lime200": lime200,
+	"lime300": lime300,
+	"lime400": lime400,
+	"lime500": lime500,
+	"lime600": lime600,
+	"lime700": lime700,
+	"lime800": lime800,
+	"lime900": lime900,
+	"lime950": lime950,
+
+	"green50":  green50,
+	"green100": green100,
+	"green200": green200,
+	"green300": green300,
+	"green400": green400,
+	"green500": green500,
+	"green600": green600,
+	"green700": green700,
+	"green800": green800,
+	"green900": green900,
+	"green950": green950,
+
+	"emerald50":  emerald50,
+	"emerald100": emerald100,
+	"emerald200": emerald200,
+	"emerald300": emerald300,
+	"emerald400": emerald400,
+	"emerald500": emerald500,
+	"emerald600": emerald600,
+	"emerald700": emerald700,
+	"emerald800": emerald800,
+	"emerald900": emerald900,
+	"emerald950": emerald950,
+
+	"teal50":  teal50,
+	"teal100": teal100,
+	"teal200": teal200,
+	"teal300": teal300,
+	"teal400": teal400,
+	"teal500": teal500,
+	"teal600": teal600,
+	"teal700": teal700,
+	"teal800": teal800,
+	"teal900": teal900,
+	"teal950": teal950,
+
+	"cyan50":  cyan50,
+	"cyan100": cyan100,
+	"cyan200": cyan200,
+	"cyan300": cyan300,
+	"cyan400": cyan400,
+	"cyan500": cyan500,
+	"cyan600": cyan600,
+	"cyan700": cyan700,
+	"cyan800": cyan800,
+	"cyan900": cyan900,
+	"cyan950": cyan950,
+
+	"sky50":  sky50,
+	"sky100": sky100,
+	"sky200": sky200,
+	"sky300": sky300,
+	"sky400": sky400,
+	"sky500": sky500,
+	"sky600": sky600,
+	"sky700": sky700,
+	"sky800": sky800,
+	"sky900": sky900,
+	"sky950": sky950,
+
+	"blue50":  blue50,
+	"blue100": blue100,
+	"blue200": blue200,
+	"blue300": blue300,
+	"blue400": blue400,
+	"blue500": blue500,
+	"blue600": blue600,
+	"blue700": blue700,
+	"blue800": blue800,
+	"blue900": blue900,
+	"blue950": blue950,
+
+	"indigo50":  indigo50,
+	"indigo100": indigo100,
+	"indigo200": indigo200,
+	"indigo300": indigo300,
+	"indigo400": indigo400,
+	"indigo500": indigo500,
+	"indigo600": indigo600,
+	"indigo700": indigo700,
+	"indigo800": indigo800,
+	"indigo900": indigo900,
+	"indigo950": indigo950,
+
+	"violet50":  violet50,
+	"violet100": violet100,
+	"violet200": violet200,
+	"violet300": violet300,
+	"violet400": violet400,
+	"violet500": violet500,
+	"violet600": violet600,
+	"violet700": violet700,
+	"violet800": violet800,
+	"violet900": violet900,
+	"violet950": violet950,
+
+	"purple50":  purple50,
+	"purple100": purple100,
+	"purple200": purple200,
+	"purple300": purple300,
+	"purple400": purple400,
+	"purple500": purple500,
+	"purple600": purple600,
+	"purple700": purple700,
+	"purple800": purple800,
+	"purple900": purple900,
+	"purple950": purple950,
+
+	"fuchsia50":  fuchsia50,
+	"fuchsia100": fuchsia100,
+	"fuchsia200": fuchsia200,
+	"fuchsia300": fuchsia300,
+	"fuchsia400": fuchsia400,
+	"fuchsia500": fuchsia500,
+	"fuchsia600": fuchsia600,
+	"fuchsia700": fuchsia700,
+	"fuchsia800": fuchsia800,
+	"fuchsia900": fuchsia900,
+	"fuchsia950": fuchsia950,
+
+	"pink50":  pink50,
+	"pink100": pink100,
+	"pink200": pink200,
+	"pink300": pink300,
+	"pink400": pink400,
+	"pink500": pink500,
+	"pink600": pink600,
+	"pink700": pink700,
+	"pink800": pink800,
+	"pink900": pink900,
+	"pink950": pink950,
+
+	"rose50":  rose50,
+	"rose100": rose100,
+	"rose200": rose200,
+	"rose300": rose300,
+	"rose400": rose400,
+	"rose500": rose500,
+	"rose600": rose600,
+	"rose700": rose700,
+	"rose800": rose800,
+	"rose900": rose900,
+	"rose950": rose950,
+}

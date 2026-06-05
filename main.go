@@ -1,260 +1,44 @@
-package main
+package nirilayout
 
 import (
-	"bytes"
 	_ "embed"
-	"errors"
-	"flag"
 	"fmt"
-	"hash/fnv"
-	"image/color"
-	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
-	"slices"
-	"strconv"
 	"strings"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/diamondburned/gotk4-layer-shell/pkg/gtk4layershell"
-	"github.com/diamondburned/gotk4/pkg/cairo"
 	"github.com/diamondburned/gotk4/pkg/gdk/v4"
-	"github.com/diamondburned/gotk4/pkg/gio/v2"
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
-
-	"github.com/calico32/kdl-go"
 )
 
-const version = `nirilayout v0.1.0`
-
-type Layout struct {
-	path      string
-	Name      string   `kdl:"name"`
-	Shortcuts []string `kdl:"shortcut"`
-	Outputs   []Output `kdl:"output,multiple"`
-}
-
-type Output struct {
-	Name         string    `kdl:",arg"`
-	NameOverride string    `kdl:"name"`
-	Color        *int      `kdl:"color"`
-	Scale        float64   `kdl:"scale"`
-	Transform    string    `kdl:"transform"`
-	Position     *Position `kdl:"position"`
-	Mode         string    `kdl:"mode"` // WWWWxHHHH[@RR.RRR]
-	Modeline     Modeline  `kdl:"modeline"`
-	Off          bool      `kdl:"off,presence"`
-}
-
-// A Modeline is a VESA CVT mode, in Xorg format.
-type Modeline struct {
-	DotClock   float64  `kdl:",arg"`
-	HDisplay   int      `kdl:",arg"`
-	HSyncStart int      `kdl:",arg"`
-	HSyncEnd   int      `kdl:",arg"`
-	HTotal     int      `kdl:",arg"`
-	VDisplay   int      `kdl:",arg"`
-	VSyncStart int      `kdl:",arg"`
-	VSyncEnd   int      `kdl:",arg"`
-	VTotal     int      `kdl:",arg"`
-	Flags      []string `kdl:",args"`
-}
-
-type Position struct {
-	X int `kdl:"x"`
-	Y int `kdl:"y"`
-}
-
-func (o Output) Rect() (x, y, w, h int) {
-	if o.Position != nil {
-		x = o.Position.X
-		y = o.Position.Y
-	} else {
-		x = -1
-		y = -1
-	}
-	if o.Modeline.DotClock != 0 {
-		w = o.Modeline.HDisplay
-		h = o.Modeline.VDisplay
-	} else if o.Mode != "" {
-		parts := strings.Split(strings.Split(o.Mode, "@")[0], "x")
-		w, _ = strconv.Atoi(parts[0])
-		h, _ = strconv.Atoi(parts[1])
-	}
-	if o.Scale != 0 {
-		w = int(float64(w) / o.Scale)
-		h = int(float64(h) / o.Scale)
-	}
-	switch o.Transform {
-	case "90", "flipped-90", "270", "flipped-270":
-		w, h = h, w
-	}
-	return
-}
-
-func parseLayoutFromConfig(filename string, niriConfig []byte) (layout Layout, err error) {
-	var sb strings.Builder
-	for line := range bytes.SplitSeq(niriConfig, []byte("\n")) {
-		l := bytes.TrimLeft(line, " \t")
-		if bytes.HasPrefix(l, []byte("//!")) {
-			sb.Write(l[3:])
-		} else {
-			sb.Write(line)
-		}
-		sb.WriteByte('\n')
-	}
-
-	err = kdl.DecodeNamed(filename, strings.NewReader(sb.String()), &layout)
-	return
-}
-
-func gatherLayouts(configDir string) ([]Layout, error) {
-	files, err := os.ReadDir(configDir)
-	if err != nil {
-		return nil, err
-	}
-
-	layouts := make([]Layout, 0, len(files))
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-		if !strings.HasPrefix(file.Name(), "layout_") || !strings.HasSuffix(file.Name(), ".kdl") {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(configDir, file.Name()))
-		if err != nil {
-			return nil, fmt.Errorf("could not read %s: %w", file.Name(), err)
-		}
-		layout, err := parseLayoutFromConfig(file.Name(), data)
-		if err != nil {
-			return nil, err
-		}
-		if layout.Name == "" {
-			layout.Name = strings.TrimSuffix(strings.TrimPrefix(file.Name(), "layout_"), ".kdl")
-		}
-
-		outputs := make([]Output, 0, len(layout.Outputs))
-		for _, output := range layout.Outputs {
-			if output.Off {
-				continue
-			}
-			if output.Modeline.DotClock == 0 && output.Mode == "" {
-				return nil, fmt.Errorf("%s: output %s: no mode or modeline defined, can't determine size (use //! mode to set a mode for this output)", file.Name(), output.Name)
-			}
-			if output.Mode != "" {
-				if !strings.Contains(output.Mode, "x") {
-					return nil, fmt.Errorf("%s: output %s: mode %q is not in the format WWWxHHH[@RR.RRR]", file.Name(), output.Name, output.Mode)
-				}
-			}
-			outputs = append(outputs, output)
-		}
-		slices.SortFunc(outputs, func(a, b Output) int {
-			return strings.Compare(a.Name, b.Name)
-		})
-		layout.Outputs = outputs
-
-		layout.path = filepath.Join(configDir, file.Name())
-		layouts = append(layouts, layout)
-	}
-
-	return layouts, nil
-}
-
-func setCurrentLayout(layout Layout) {
-	configDir, err := getNiriConfigDir()
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	temp := filepath.Join(configDir, fmt.Sprintf("nirilayout-%d.kdl", unix.Getpid()))
-
-	err = os.Symlink(layout.path, temp)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	err = os.Rename(temp, filepath.Join(configDir, "nirilayout.kdl"))
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-}
-
-var niriConfigDir = flag.String("c", "~/.config/niri", "niri config directory")
-
-func getNiriConfigDir() (configDir string, err error) {
-	if strings.HasPrefix(*niriConfigDir, "~") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		configDir = filepath.Join(home, (*niriConfigDir)[1:])
-	} else {
-		configDir = *niriConfigDir
-	}
-
-	configDir, err = filepath.Abs(configDir)
-	if err != nil {
-		return "", err
-	}
-
-	return
-}
-
-func main() {
-	flag.Parse()
-
-	var layouts []Layout
-	var current string
-
-	configDir, err := getNiriConfigDir()
-
-	if err == nil {
-		layouts, err = gatherLayouts(configDir)
-	}
-
-	if err == nil {
-		current, err = os.Readlink(filepath.Join(configDir, "nirilayout.kdl"))
-		if errors.Is(err, fs.ErrNotExist) {
-			err = nil
-		}
-	}
-
-	index := slices.IndexFunc(layouts, func(layout Layout) bool {
-		return layout.path == current
-	})
-	if index == -1 {
-		index = 0
-	}
-
-	app := gtk.NewApplication("co.calebc.nirilayout", gio.ApplicationDefaultFlags)
-	app.ConnectActivate(func() {
-		activate(app, layouts, index, err)
-	})
-
-	if code := app.Run(nil); code > 0 {
-		os.Exit(code)
-	}
-}
+const version = `nirilayout v0.2.0`
 
 //go:embed style.css
-var stylesheet string
+var appStylesheet string
 
-func activate(app *gtk.Application, layouts []Layout, startIndex int, err error) {
+func loadStylesheet(content string) *gtk.CSSProvider {
+	prov := gtk.NewCSSProvider()
+	prov.ConnectParsingError(func(sec *gtk.CSSSection, err error) {
+		loc := sec.StartLocation()
+		lines := strings.Split(content, "\n")
+		log.Printf("CSS error (%v) at line: %q", err, lines[loc.Lines()])
+	})
+	prov.LoadFromString(content)
+	return prov
+}
+
+func Run(app *gtk.Application, layouts []Layout, startIndex int, err error) {
 	// load default stylesheet
 	gtk.StyleContextAddProviderForDisplay(
-		gdk.DisplayGetDefault(), loadStylesheet(stylesheet),
+		gdk.DisplayGetDefault(), loadStylesheet(appStylesheet),
 		gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
 	)
 
 	// load ~/.config/niri/nirilayout.css if it exists, to allow user overrides of the default stylesheet
-	configDir, configErr := getNiriConfigDir()
+	configDir, configErr := GetNiriConfigDir()
 	if configErr == nil {
 		userStylesheetPath := filepath.Join(configDir, "nirilayout.css")
 		if _, err := os.Stat(userStylesheetPath); err == nil {
@@ -315,7 +99,7 @@ func activate(app *gtk.Application, layouts []Layout, startIndex int, err error)
 		button := gtk.NewButton()
 		b := gtk.NewBox(gtk.OrientationVertical, 8)
 		container := gtk.NewCenterBox()
-		container.SetSizeRequest(200, 200)
+		container.SetSizeRequest(drawingSize, drawingSize)
 		preview := drawLayout(layout)
 		preview.SetHAlign(gtk.AlignCenter)
 		preview.SetVAlign(gtk.AlignCenter)
@@ -330,7 +114,7 @@ func activate(app *gtk.Application, layouts []Layout, startIndex int, err error)
 
 		button.SetChild(b)
 		button.ConnectClicked(func() {
-			setCurrentLayout(layout)
+			SetCurrentLayout(layout)
 			app.Quit()
 		})
 
@@ -354,12 +138,12 @@ func activate(app *gtk.Application, layouts []Layout, startIndex int, err error)
 		for _, layout := range layouts {
 			for _, shortcut := range layout.Shortcuts {
 				if text == shortcut {
-					setCurrentLayout(layout)
+					SetCurrentLayout(layout)
 					app.Quit()
 				}
 			}
 			if text == layout.Name {
-				setCurrentLayout(layout)
+				SetCurrentLayout(layout)
 				quit()
 			}
 		}
@@ -438,7 +222,7 @@ func activate(app *gtk.Application, layouts []Layout, startIndex int, err error)
 			return true
 		case gdk.KEY_Return:
 			if len(layouts) != 0 {
-				setCurrentLayout(layouts[index])
+				SetCurrentLayout(layouts[index])
 			}
 			quit()
 			return true
@@ -448,198 +232,4 @@ func activate(app *gtk.Application, layouts []Layout, startIndex int, err error)
 	input.AddController(k)
 
 	win.SetVisible(true)
-}
-
-type placedOutput struct {
-	name           string
-	color          *int
-	xp, yp, wp, hp int
-}
-
-// Niri repositions outputs from scratch every time the output configuration
-// changes (which includes monitors disconnecting and connecting). The following
-// algorithm is used for positioning outputs.
-//   - Collect all connected monitors and their logical sizes.
-//   - Sort them by their name. This makes it so the automatic positioning does
-//     not depend on the order the monitors are connected. This is important
-//     because the connection order is non-deterministic at compositor startup.
-//   - Try to place every output with explicitly configured position, in order.
-//     If the output overlaps previously placed outputs, place it to the right
-//     of all previously placed outputs. In this case, niri will also print a
-//     warning.
-//   - Place every output without explicitly configured position by putting it
-//     to the right of all previously placed outputs.
-func placeOutputs(outputs []Output) []placedOutput {
-	slices.SortFunc(outputs, func(a, b Output) int {
-		return strings.Compare(a.Name, b.Name)
-	})
-
-	var placed []placedOutput
-
-	autoX := 0
-
-	// place outputs with explicitly configured position
-	for _, output := range outputs {
-		if output.Position == nil {
-			continue
-		}
-
-		x, y, w, h := output.Rect()
-
-		overlap := false
-		for _, placedOutput := range placed {
-			xp, yp, wp, hp := placedOutput.xp, placedOutput.yp, placedOutput.wp, placedOutput.hp
-			if x+w > xp && x < xp+wp && y+h > yp && y < yp+hp {
-				overlap = true
-				break
-			}
-		}
-		if overlap {
-			x = autoX
-			y = 0
-		}
-		name := output.Name
-		if output.NameOverride != "" {
-			name = output.NameOverride
-		}
-		placed = append(placed, placedOutput{
-			name:  name,
-			color: output.Color,
-			xp:    x,
-			yp:    y,
-			wp:    w,
-			hp:    h,
-		})
-		autoX = max(autoX, x+w)
-	}
-
-	// place outputs without explicitly configured position
-	for _, output := range outputs {
-		if output.Position != nil {
-			continue
-		}
-
-		_, _, w, h := output.Rect()
-		x := autoX
-		y := 0
-		name := output.Name
-		if output.NameOverride != "" {
-			name = output.NameOverride
-		}
-		placed = append(placed, placedOutput{
-			name:  name,
-			color: output.Color,
-			xp:    x,
-			yp:    y,
-			wp:    w,
-			hp:    h,
-		})
-		autoX = x + w
-	}
-
-	return placed
-}
-
-func drawLayout(layout Layout) *gtk.DrawingArea {
-	const targetSize = 200
-	const borderWidth = 2
-
-	outputs := placeOutputs(layout.Outputs)
-
-	da := gtk.NewDrawingArea()
-	layoutWidth := float64(targetSize)
-	layoutHeight := float64(targetSize)
-	for _, o := range outputs {
-		layoutWidth = max(layoutWidth, float64(o.xp)+float64(o.wp))
-		layoutHeight = max(layoutHeight, float64(o.yp)+float64(o.hp))
-	}
-	scale := min(targetSize/layoutWidth, targetSize/layoutHeight)
-	da.SetSizeRequest(int(layoutWidth*scale)+borderWidth, int(layoutHeight*scale)+borderWidth)
-
-	da.SetDrawFunc(func(drawingArea *gtk.DrawingArea, cr *cairo.Context, width, height int) {
-		cr.SetSourceRGBA(0, 0, 0, 0)
-		cr.Paint()
-		cr.SelectFontFace("monospace", cairo.FontSlantNormal, cairo.FontWeightNormal)
-		cr.SetFontSize(10)
-		cr.MoveTo(0, 0)
-
-		if len(outputs) == 0 {
-			extents := cr.TextExtents("no preview available")
-			cr.MoveTo(float64(width)/2-extents.Width/2-extents.XBearing, float64(height)/2-extents.Height/2-extents.YBearing)
-			cr.SetSourceRGBA(rgba(gray400))
-			cr.ShowText("no preview available")
-			return
-		}
-
-		for _, o := range outputs {
-			x, y, w, h := float64(o.xp)*scale, float64(o.yp)*scale,
-				float64(o.wp)*scale, float64(o.hp)*scale
-
-			windowColor, borderColor := pickWindowColors(o.name, o.color)
-
-			cr.Rectangle(x, y, w, h)
-			cr.SetSourceRGBA(rgba(windowColor))
-			cr.Fill()
-
-			cr.Rectangle(x+borderWidth/2, y+borderWidth/2, w-borderWidth, h-borderWidth)
-			cr.SetLineWidth(borderWidth)
-			cr.SetSourceRGBA(rgba(borderColor))
-			cr.Stroke()
-
-			extents := cr.TextExtents(o.name)
-			cr.MoveTo(x+w/2-extents.Width/2-extents.XBearing, y+h/2-extents.Height/2-extents.YBearing)
-			cr.SetSourceRGBA(rgba(gray100))
-			cr.ShowText(o.name)
-		}
-	})
-
-	return da
-}
-
-var fillColors = []color.Color{
-	gray600,
-	red700, orange700, amber700, yellow700,
-	lime700, green700, emerald700, teal700,
-	cyan700, sky700, blue700, indigo700,
-	violet700, purple700, fuchsia700, pink700,
-	rose700,
-}
-
-var borderColors = []color.Color{
-	gray400,
-	red500, orange500, amber500, yellow500,
-	lime500, green500, emerald500, teal500,
-	cyan500, sky500, blue500, indigo500,
-	violet500, purple500, fuchsia500, pink500,
-	rose500,
-}
-
-func pickWindowColors(name string, i *int) (fill, border color.Color) {
-	if i != nil {
-		return fillColors[*i%len(fillColors)], borderColors[*i%len(borderColors)]
-	}
-	h := fnv.New32a()
-	h.Write([]byte(name))
-	index := int(h.Sum32()) % len(fillColors)
-	return fillColors[index], borderColors[index]
-}
-
-func rgba(color color.Color) (r, g, b, a float64) {
-	rw, gw, bw, aw := color.RGBA()
-	r = float64(rw) / 0xffff
-	g = float64(gw) / 0xffff
-	b = float64(bw) / 0xffff
-	a = float64(aw) / 0xffff
-	return
-}
-
-func loadStylesheet(content string) *gtk.CSSProvider {
-	prov := gtk.NewCSSProvider()
-	prov.ConnectParsingError(func(sec *gtk.CSSSection, err error) {
-		loc := sec.StartLocation()
-		lines := strings.Split(content, "\n")
-		log.Printf("CSS error (%v) at line: %q", err, lines[loc.Lines()])
-	})
-	prov.LoadFromString(content)
-	return prov
 }
