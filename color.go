@@ -48,6 +48,10 @@ func parseColor(s string) (color.RGBA, error) {
 		return c, nil
 	}
 
+	if len(s) == 0 {
+		return color.RGBA{}, fmt.Errorf("invalid color: empty string")
+	}
+
 	if s[0] == '#' {
 		return parseHexColor(s)
 	}
