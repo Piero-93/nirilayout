@@ -7,16 +7,17 @@ builds:
   - env: [CGO_ENABLED=1]
     goos: [linux]
     goarch: [amd64]
-    mod_timestamp: '{{ .CommitTimestamp }}'
+    mod_timestamp: "{{ .CommitTimestamp }}"
     flags: [-trimpath]
     ldflags: [-s -w]
+    main: ./cmd/nirilayout
 
 archives:
   - formats: binary
-    name_template: '{{ .ProjectName }}'
+    name_template: "{{ .ProjectName }}"
 
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 
 release:
   prerelease: auto
@@ -27,9 +28,9 @@ changelog:
   format: '{{ .SHA }}: {{ .Message }}{{ if and (not (eq .AuthorUsername "calico32")) (not (eq .AuthorUsername "")) }} (@{{ .AuthorUsername }}){{ end }}'
   filters:
     exclude:
-      - '^ci:'
-      - '^docs:'
-      - '^refactor:'
-      - '^style:'
-      - '^test:'
-      - '^Merge pull request'
+      - "^ci:"
+      - "^docs:"
+      - "^refactor:"
+      - "^style:"
+      - "^test:"
+      - "^Merge pull request"
