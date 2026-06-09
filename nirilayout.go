@@ -14,7 +14,7 @@ import (
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 )
 
-const version = `nirilayout v0.2.0`
+const version = `nirilayout v0.3.0`
 
 //go:embed style.css
 var appStylesheet string
