@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"io/fs"
 	"nirilayout"
 	"os"
@@ -14,6 +15,13 @@ import (
 )
 
 func main() {
+	flag.Usage = func() {
+		fmt.Printf("nirilayout is a layout switcher for niri.\n\nCommand-line options:\n")
+		flag.PrintDefaults()
+		fmt.Printf("\nTo use nirilayout, create layouts in files called ~/.config/niri/layout_<name>.kdl and run nirilayout.\nSee the README for more details:\n")
+		fmt.Printf("  https://github.com/calico32/nirilayout/blob/main/README.md\n")
+	}
+
 	flag.Parse()
 
 	var layouts []nirilayout.Layout
