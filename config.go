@@ -214,7 +214,7 @@ func parseLayoutFromConfig(filename string, niriConfig []byte) (layout Layout, e
 		sb.WriteByte('\n')
 	}
 
-	err = kdl.DecodeNamed(filename, strings.NewReader(sb.String()), &layout)
+	err = kdl.Decode(strings.NewReader(sb.String()), &layout, kdl.WithSourceName(filename))
 	if err != nil {
 		return
 	}
