@@ -80,6 +80,41 @@ func GatherLayouts(configDir string) ([]Layout, error) {
 	return layouts, nil
 }
 
+// CurrentLayoutPath returns the Path of the layout currently written to
+// nirilayout.kdl, or "" if it can't be determined.
+//
+// The classic setup makes nirilayout.kdl a symlink to the active layout file
+// (see SetCurrentLayout), so a successful Readlink resolves the answer
+// directly. Other setups (e.g. noctalia 5) instead write nirilayout.kdl as a
+// regular file containing a copy of the active layout; there Readlink fails,
+// so we fall back to matching its contents against the known layout files.
+func CurrentLayoutPath(configDir string, layouts []Layout) string {
+	path := filepath.Join(configDir, "nirilayout.kdl")
+
+	if target, err := os.Readlink(path); err == nil {
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(configDir, target)
+		}
+		return target
+	}
+
+	// Not a symlink (or an unreadable link): compare file contents instead.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	for _, layout := range layouts {
+		other, err := os.ReadFile(layout.Path)
+		if err != nil {
+			continue
+		}
+		if bytes.Equal(data, other) {
+			return layout.Path
+		}
+	}
+	return ""
+}
+
 func SetCurrentLayout(layout Layout) {
 	configDir, err := GetNiriConfigDir()
 	if err != nil {
