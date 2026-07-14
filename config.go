@@ -83,11 +83,12 @@ func GatherLayouts(configDir string) ([]Layout, error) {
 // CurrentLayoutPath returns the Path of the layout currently written to
 // nirilayout.kdl, or "" if it can't be determined.
 //
-// The classic setup makes nirilayout.kdl a symlink to the active layout file
-// (see SetCurrentLayout), so a successful Readlink resolves the answer
-// directly. Other setups (e.g. noctalia 5) instead write nirilayout.kdl as a
-// regular file containing a copy of the active layout; there Readlink fails,
-// so we fall back to matching its contents against the known layout files.
+// SetCurrentLayout now always writes nirilayout.kdl as a regular file, so the
+// answer normally comes from matching its contents against the known layout
+// files. We still try Readlink first for backward compatibility: older
+// nirilayout versions (and the classic setup) left nirilayout.kdl as a symlink
+// to the active layout, which a successful Readlink resolves directly. Once the
+// user switches layouts under this version, it becomes a regular file.
 func CurrentLayoutPath(configDir string, layouts []Layout) string {
 	path := filepath.Join(configDir, "nirilayout.kdl")
 
@@ -122,9 +123,21 @@ func SetCurrentLayout(layout Layout) {
 		return
 	}
 
+	// Write the selected layout's contents into nirilayout.kdl as a regular
+	// file, atomically (temp file + rename). This used to create a symlink,
+	// but some setups (e.g. noctalia) manage nirilayout.kdl as a regular file
+	// and never followed a symlink swap, so switching layouts did nothing. A
+	// plain copy works for every setup: niri's `include` reads the contents
+	// either way, and CurrentLayoutPath matches the active layout by contents.
+	data, err := os.ReadFile(layout.Path)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
 	temp := filepath.Join(configDir, fmt.Sprintf("nirilayout-%d.kdl", unix.Getpid()))
 
-	err = os.Symlink(layout.Path, temp)
+	err = os.WriteFile(temp, data, 0o644)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -132,6 +145,7 @@ func SetCurrentLayout(layout Layout) {
 
 	err = os.Rename(temp, filepath.Join(configDir, "nirilayout.kdl"))
 	if err != nil {
+		os.Remove(temp)
 		log.Fatal(err)
 		return
 	}
