@@ -188,6 +188,51 @@ prefixes of each other.
 Layouts are presented in lexicographical order by name. If you want to change
 the order, you can rename the files in the config directory.
 
+## Automatic recovery (watch mode)
+
+A layout that turns an output `off` keeps it off even when the situation
+changes. For example, an "external only" layout with
+
+```kdl
+//! output "eDP-1" { off }
+```
+
+leaves the built-in panel off. If you then unplug the external monitor — or boot
+with it already unplugged — niri honors that `off` and no output is left
+drawing, so you get a black screen. nirilayout only ever runs when you launch it
+by hand, so on its own it cannot react to a cable being pulled.
+
+Watch mode fixes this. Run
+
+```sh
+nirilayout --watch
+```
+
+and nirilayout stays in the background instead of showing the GUI. Whenever no
+output is active, it applies a *safe* layout and niri reloads it, lighting a
+screen back up. It reacts to niri events immediately and also polls periodically
+as a safety net.
+
+By default the safe layout is auto-picked: among your layouts, nirilayout
+chooses one whose enabled outputs are all currently connected, preferring the
+one that lights up the most monitors (so a single laptop panel is used only when
+nothing better is plugged in). To force a specific layout instead, name it with
+`--fallback`:
+
+```sh
+nirilayout --watch --fallback "Laptop Only"
+```
+
+To have it always running, spawn it at niri startup:
+
+```kdl
+// In config.kdl:
+spawn-at-startup "nirilayout" "--watch"
+```
+
+Watch mode never touches the screen while an output is already active, so it is
+safe to leave running alongside normal use of the GUI switcher.
+
 ## Command-line options
 
 | Option        | Description                                                                                  |
@@ -196,6 +241,8 @@ the order, you can rename the files in the config directory.
 | `-lang <code>`| Interface language code, e.g. `it`. Overrides the system locale. See [Localization](#localization). |
 | `-lowercase`  | Render all of nirilayout's own interface text in lowercase. See [Casing](#casing).           |
 | `-leftalign`  | Left-align the text in the search box. See [Search box alignment](#search-box-alignment).    |
+| `-watch`      | Run as a background daemon that recovers a black screen instead of showing the GUI. See [Automatic recovery](#automatic-recovery-watch-mode). |
+| `-fallback <name>` | In watch mode, the layout to apply when no output is active. See [Automatic recovery](#automatic-recovery-watch-mode). |
 
 Run `nirilayout -h` for the full list.
 

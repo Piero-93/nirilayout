@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nirilayout\n"
 "Report-Msgid-Bugs-To: https://github.com/calico32/nirilayout/issues\n"
-"POT-Creation-Date: 2026-06-14 07:39+0200\n"
+"POT-Creation-Date: 2026-07-17 08:46+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -37,15 +37,15 @@ msgstr ""
 msgid "No preview available"
 msgstr ""
 
-#: i18n_test.go:34 i18n_test.go:67 nirilayout.go:159
+#: i18n_test.go:30 i18n_test.go:61 nirilayout.go:162
 msgid "Esc to quit"
 msgstr ""
 
-#: i18n_test.go:37 i18n_test.go:50 nirilayout.go:80
+#: i18n_test.go:33 i18n_test.go:46 nirilayout.go:80
 msgid "Error loading layouts: %v"
 msgstr ""
 
-#: i18n_test.go:47 nirilayout.go:139
+#: i18n_test.go:43 nirilayout.go:142
 msgid "Name or shortcut…"
 msgstr ""
 
@@ -55,14 +55,27 @@ msgid ""
 "use nirilayout."
 msgstr ""
 
-#: cmd/nirilayout/main.go:24
+#: watch.go:16
+msgid ""
+"run as a background daemon that reactivates a working output when the active "
+"one disappears (cable unplug or boot without an external monitor), instead "
+"of showing the GUI"
+msgstr ""
+
+#: watch.go:17
+msgid ""
+"in watch mode, the name of the layout to apply when no output is active; if "
+"empty, one is auto-picked from the connected outputs"
+msgstr ""
+
+#: cmd/nirilayout/main.go:21
 msgid ""
 "nirilayout is a layout switcher for niri.\n"
 "\n"
 "Command-line options:\n"
 msgstr ""
 
-#: cmd/nirilayout/main.go:31
+#: cmd/nirilayout/main.go:28
 msgid ""
 "\n"
 "To use nirilayout, create layouts in files called ~/.config/niri/"
