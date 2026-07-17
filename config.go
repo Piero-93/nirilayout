@@ -122,39 +122,48 @@ func CurrentLayoutPath(configDir string, layouts []Layout) string {
 	return ""
 }
 
+// SetCurrentLayout writes the given layout as the active one, aborting the
+// process with log.Fatal on any error. It is the GUI entry point, where a
+// failure to switch layouts is unrecoverable and should stop the program.
+//
+// The watch daemon must keep running past a transient error, so it calls
+// WriteLayout (the non-fatal variant) directly.
 func SetCurrentLayout(layout Layout) {
+	if err := WriteLayout(layout); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// WriteLayout writes the selected layout's contents into nirilayout.kdl as a
+// regular file, atomically (temp file + rename), and returns any error instead
+// of aborting. This used to create a symlink, but some setups (e.g. noctalia)
+// manage nirilayout.kdl as a regular file and never followed a symlink swap, so
+// switching layouts did nothing. A plain copy works for every setup: niri's
+// `include` reads the contents either way, and CurrentLayoutPath matches the
+// active layout by contents.
+func WriteLayout(layout Layout) error {
 	configDir, err := GetNiriConfigDir()
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 
-	// Write the selected layout's contents into nirilayout.kdl as a regular
-	// file, atomically (temp file + rename). This used to create a symlink,
-	// but some setups (e.g. noctalia) manage nirilayout.kdl as a regular file
-	// and never followed a symlink swap, so switching layouts did nothing. A
-	// plain copy works for every setup: niri's `include` reads the contents
-	// either way, and CurrentLayoutPath matches the active layout by contents.
 	data, err := os.ReadFile(layout.Path)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 
 	temp := filepath.Join(configDir, fmt.Sprintf("nirilayout-%d.kdl", unix.Getpid()))
 
-	err = os.WriteFile(temp, data, 0o644)
-	if err != nil {
-		log.Fatal(err)
-		return
+	if err := os.WriteFile(temp, data, 0o644); err != nil {
+		return err
 	}
 
-	err = os.Rename(temp, filepath.Join(configDir, "nirilayout.kdl"))
-	if err != nil {
+	if err := os.Rename(temp, filepath.Join(configDir, "nirilayout.kdl")); err != nil {
 		os.Remove(temp)
-		log.Fatal(err)
-		return
+		return err
 	}
+
+	return nil
 }
 
 type Layout struct {

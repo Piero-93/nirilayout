@@ -41,6 +41,22 @@ func main() {
 		layouts, err = nirilayout.GatherLayouts(configDir)
 	}
 
+	// Watch mode runs a headless daemon instead of the GUI: it reactivates a
+	// working output whenever the active one disappears (cable unplug or boot
+	// with no external monitor). It needs the layouts to recover to, so a
+	// gather error here is fatal rather than a fall-through to the picker.
+	if nirilayout.Watch() {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if werr := nirilayout.RunWatch(configDir, layouts); werr != nil {
+			fmt.Fprintln(os.Stderr, werr)
+			os.Exit(1)
+		}
+		return
+	}
+
 	// Preselect the active layout. Detection works whether nirilayout.kdl is a
 	// symlink (classic setup) or a regular file (e.g. noctalia 5); if it can't
 	// be determined we just fall back to the first layout, never an error.
