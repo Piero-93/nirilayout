@@ -57,11 +57,12 @@ func main() {
 		return
 	}
 
-	// Layouts that need a monitor which is not plugged in are shown dimmed and
-	// cannot be applied. Off by default: without the flag every layout stays
-	// selectable, as before.
-	if err == nil && nirilayout.DimUnavailable() {
-		nirilayout.MarkUnavailable(layouts)
+	// Layouts that need a monitor which is not plugged in can be dimmed or
+	// hidden, depending on the flags. Off by default: every layout stays
+	// selectable, as before. Must run before the current layout is located,
+	// since hiding renumbers the list.
+	if err == nil {
+		layouts = nirilayout.ApplyAvailability(layouts)
 	}
 
 	// Preselect the active layout. Detection works whether nirilayout.kdl is a

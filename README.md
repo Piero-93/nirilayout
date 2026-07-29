@@ -188,29 +188,38 @@ prefixes of each other.
 Layouts are presented in lexicographical order by name. If you want to change
 the order, you can rename the files in the config directory.
 
-### Optional: Dim layouts you cannot use right now
+### Optional: Skip layouts you cannot use right now
 
 By default every layout is selectable, including ones that need a monitor you
-have not plugged in — applying such a layout leaves that output dark. Pass
-`-dim-unavailable` to have nirilayout ask niri which outputs are connected and
-mark the layouts that cannot be applied:
+have not plugged in — applying such a layout leaves that output dark. Two
+opt-in flags make nirilayout ask niri which outputs are connected and act on the
+layouts that cannot be applied:
 
 ```sh
-nirilayout -dim-unavailable
+nirilayout -dim-unavailable   # keep them visible, but unselectable
+nirilayout -hide-unavailable  # leave them out of the picker entirely
 ```
 
 A layout is *unavailable* when any output it enables is not connected. Outputs
 the layout turns `off` never count, so a laptop-only layout stays available with
-nothing plugged in. Unavailable layouts stay visible in the grid, so you still
-see they exist, but they are dimmed, labelled with the missing connector, and
-cannot be selected — by mouse, by `Return`, or by typing their name or shortcut.
-The arrow keys skip over them.
+nothing plugged in.
 
-The currently active layout keeps its marker even when it becomes unavailable
-(you unplugged the monitor after applying it); the selection just starts on the
-first layout you can actually apply. If niri cannot be queried, nirilayout logs
-the failure and shows every layout as selectable rather than dimming layouts
-that may well be fine.
+With `-dim-unavailable`, unavailable layouts stay in the grid, so you still see
+they exist, but they are dimmed, labelled with the missing connector, and cannot
+be selected — by mouse, by `Return`, or by typing their name or shortcut. The
+arrow keys skip over them. The currently active layout keeps its marker even
+when it becomes unavailable (you unplugged the monitor after applying it); the
+selection just starts on the first layout you can actually apply.
+
+With `-hide-unavailable`, they are not shown at all, and their shortcuts do
+nothing. If that leaves nothing to pick, the switcher says so instead of
+claiming you have no layouts.
+
+Passing both flags hides: a layout left out of the picker cannot also be shown
+dimmed in it.
+
+If niri cannot be queried, nirilayout logs the failure and offers every layout
+rather than dimming or hiding layouts that may well be fine.
 
 Style the dimmed entries with `button.unavailable` and `label.missing-outputs`
 in your custom CSS. See [Configure custom CSS](#optional-configure-custom-css).
@@ -268,7 +277,8 @@ safe to leave running alongside normal use of the GUI switcher.
 | `-lang <code>`| Interface language code, e.g. `it`. Overrides the system locale. See [Localization](#localization). |
 | `-lowercase`  | Render all of nirilayout's own interface text in lowercase. See [Casing](#casing).           |
 | `-leftalign`  | Left-align the text in the search box. See [Search box alignment](#search-box-alignment).    |
-| `-dim-unavailable` | Dim layouts whose outputs are not all connected and make them unselectable. See [Dim layouts you cannot use right now](#optional-dim-layouts-you-cannot-use-right-now). |
+| `-dim-unavailable` | Dim layouts whose outputs are not all connected and make them unselectable. See [Skip layouts you cannot use right now](#optional-skip-layouts-you-cannot-use-right-now). |
+| `-hide-unavailable` | Leave those layouts out of the picker entirely. Takes precedence over `-dim-unavailable`. See [Skip layouts you cannot use right now](#optional-skip-layouts-you-cannot-use-right-now). |
 | `-watch`      | Run as a background daemon that recovers a black screen instead of showing the GUI. See [Automatic recovery](#automatic-recovery-watch-mode). |
 | `-fallback <name>` | In watch mode, the layout to apply when no output is active. See [Automatic recovery](#automatic-recovery-watch-mode). |
 

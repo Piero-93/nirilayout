@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: nirilayout\n"
 "Report-Msgid-Bugs-To: https://github.com/calico32/nirilayout/issues\n"
-"POT-Creation-Date: 2026-07-28 20:46+0200\n"
+"POT-Creation-Date: 2026-07-29 06:54+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,9 +17,15 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: availability.go:8
+#: availability.go:9
 msgid ""
 "dim layouts whose outputs are not all connected and make them unselectable"
+msgstr ""
+
+#: availability.go:10
+msgid ""
+"hide layouts whose outputs are not all connected; takes precedence over -dim-"
+"unavailable"
 msgstr ""
 
 #: config.go:29
@@ -42,7 +48,7 @@ msgstr ""
 msgid "No preview available"
 msgstr ""
 
-#: i18n_test.go:30 i18n_test.go:61 nirilayout.go:197
+#: i18n_test.go:30 i18n_test.go:61 nirilayout.go:203
 msgid "Esc to quit"
 msgstr ""
 
@@ -50,17 +56,23 @@ msgstr ""
 msgid "Error loading layouts: %v"
 msgstr ""
 
-#: i18n_test.go:43 nirilayout.go:174
+#: i18n_test.go:43 nirilayout.go:180
 msgid "Name or shortcut…"
 msgstr ""
 
-#: nirilayout.go:85
+#: nirilayout.go:87
 msgid ""
 "No layouts found. Please create layout_<name>.kdl files in ~/.config/niri to "
 "use nirilayout."
 msgstr ""
 
-#: nirilayout.go:141
+#: nirilayout.go:89
+msgid ""
+"No layout matches the connected outputs. Plug a monitor back in, or run "
+"without -hide-unavailable to see every layout."
+msgstr ""
+
+#: nirilayout.go:147
 #, c-format
 msgid "%s not connected"
 msgstr ""

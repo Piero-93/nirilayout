@@ -82,7 +82,13 @@ func Run(app *gtk.Application, layouts []Layout, startIndex int, err error) {
 		label.SetHAlign(gtk.AlignCenter)
 		root.Append(label)
 	} else if len(layouts) == 0 {
-		label := gtk.NewLabel(T("No layouts found. Please create layout_<name>.kdl files in ~/.config/niri to use nirilayout."))
+		// With -hide-unavailable the picker can be empty even though layouts
+		// exist, so say which of the two situations this is.
+		msg := T("No layouts found. Please create layout_<name>.kdl files in ~/.config/niri to use nirilayout.")
+		if hiddenLayoutCount > 0 {
+			msg = T("No layout matches the connected outputs. Plug a monitor back in, or run without -hide-unavailable to see every layout.")
+		}
+		label := gtk.NewLabel(msg)
 		label.SetHAlign(gtk.AlignCenter)
 		root.Append(label)
 	} else {
