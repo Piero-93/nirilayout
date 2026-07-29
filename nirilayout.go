@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/diamondburned/gotk4-layer-shell/pkg/gtk4layershell"
@@ -95,6 +96,23 @@ func Run(app *gtk.Application, layouts []Layout, startIndex int, err error) {
 		root.Append(selector)
 	}
 
+	// An unavailable layout (one whose outputs are not all connected, see
+	// -dim-unavailable) stays in the grid but cannot be applied: it is dimmed,
+	// skipped by the arrow keys, and ignored by the search box.
+	selectable := func(i int) bool {
+		return i >= 0 && i < len(layouts) && !layouts[i].Unavailable
+	}
+
+	// The current layout keeps its marker even when it is unavailable (the
+	// monitor was unplugged after it was applied), but the selection must start
+	// somewhere Return can act on.
+	currentIndex := startIndex
+	if !selectable(startIndex) {
+		if i := slices.IndexFunc(layouts, func(l Layout) bool { return !l.Unavailable }); i != -1 {
+			startIndex = i
+		}
+	}
+
 	for i, layout := range layouts {
 		if selector == nil {
 			break
@@ -116,16 +134,30 @@ func Run(app *gtk.Application, layouts []Layout, startIndex int, err error) {
 		}
 
 		button.SetChild(b)
-		button.ConnectClicked(func() {
-			SetCurrentLayout(layout)
-			app.Quit()
-		})
 
-		button.SetCursorFromName("pointer")
+		if layout.Unavailable {
+			// Say which connector is missing, so a layout that suddenly cannot
+			// be picked explains itself instead of just looking broken.
+			missing := gtk.NewLabel(Tf("%s not connected", strings.Join(layout.MissingOutputs, ", ")))
+			missing.AddCSSClass("missing-outputs")
+			b.Append(missing)
+
+			button.AddCSSClass("unavailable")
+			button.SetSensitive(false)
+		} else {
+			button.ConnectClicked(func() {
+				SetCurrentLayout(layout)
+				app.Quit()
+			})
+
+			button.SetCursorFromName("pointer")
+		}
 
 		selector.Insert(button, -1)
 		if i == startIndex {
 			button.AddCSSClass("selected")
+		}
+		if i == currentIndex {
 			button.AddCSSClass("current")
 		}
 	}
@@ -143,6 +175,9 @@ func Run(app *gtk.Application, layouts []Layout, startIndex int, err error) {
 	input.ConnectChanged(func() {
 		text := input.Text()
 		for _, layout := range layouts {
+			if layout.Unavailable {
+				continue
+			}
 			for _, shortcut := range layout.Shortcuts {
 				if text == shortcut {
 					SetCurrentLayout(layout)
@@ -192,6 +227,24 @@ func Run(app *gtk.Application, layouts []Layout, startIndex int, err error) {
 		}
 	}
 
+	// nextSelectable returns the first selectable layout starting at `from` and
+	// walking by `delta`, wrapping around the grid, or -1 when none is
+	// selectable. Navigation uses it so the arrow keys skip dimmed layouts
+	// instead of parking the selection on one that Return cannot apply.
+	nextSelectable := func(from, delta int) int {
+		n := len(layouts)
+		if n == 0 {
+			return -1
+		}
+		for i := 0; i < n; i++ {
+			j := ((from+delta*i)%n + n) % n
+			if selectable(j) {
+				return j
+			}
+		}
+		return -1
+	}
+
 	k := gtk.NewEventControllerKey()
 	k.SetPropagationPhase(gtk.PhaseCapture)
 	k.ConnectKeyPressed(func(keyval uint, keycode uint, state gdk.ModifierType) bool {
@@ -200,35 +253,41 @@ func Run(app *gtk.Application, layouts []Layout, startIndex int, err error) {
 			quit()
 			return true
 		case gdk.KEY_Right:
-			index++
-			if index >= len(layouts) {
-				index = 0
+			if j := nextSelectable(index+1, 1); j != -1 {
+				index = j
 			}
 			setActiveLayout(index)
 			return true
 		case gdk.KEY_Left:
-			index--
-			if index < 0 {
-				index = len(layouts) - 1
+			if j := nextSelectable(index-1, -1); j != -1 {
+				index = j
 			}
 			setActiveLayout(index)
 			return true
 		case gdk.KEY_Up:
+			// Vertical movement does not wrap; if every layout above the target
+			// row is unavailable, the selection stays where it is.
 			skip := int(selector.MaxChildrenPerLine())
-			if index-skip >= 0 {
-				index -= skip
+			for j := index - skip; j >= 0; j-- {
+				if selectable(j) {
+					index = j
+					break
+				}
 			}
 			setActiveLayout(index)
 			return true
 		case gdk.KEY_Down:
 			skip := int(selector.MaxChildrenPerLine())
-			if index+skip < len(layouts) {
-				index += skip
+			for j := index + skip; j < len(layouts); j++ {
+				if selectable(j) {
+					index = j
+					break
+				}
 			}
 			setActiveLayout(index)
 			return true
 		case gdk.KEY_Return:
-			if len(layouts) != 0 {
+			if len(layouts) != 0 && selectable(index) {
 				SetCurrentLayout(layouts[index])
 			}
 			quit()

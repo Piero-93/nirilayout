@@ -172,6 +172,13 @@ type Layout struct {
 	Shortcuts    []string          `kdl:"shortcut"`
 	DefaultStyle outputStyleConfig `kdl:"style"`
 	Outputs      []*Output         `kdl:"output,multiple"`
+
+	// Unavailable marks a layout that enables an output niri does not currently
+	// see, with MissingOutputs naming those outputs. Both are filled in by
+	// MarkUnavailable when -dim-unavailable is passed, and are otherwise zero,
+	// which the GUI reads as "every layout is selectable".
+	Unavailable    bool     `kdl:"-"`
+	MissingOutputs []string `kdl:"-"`
 }
 
 type Output struct {

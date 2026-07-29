@@ -57,6 +57,13 @@ func main() {
 		return
 	}
 
+	// Layouts that need a monitor which is not plugged in are shown dimmed and
+	// cannot be applied. Off by default: without the flag every layout stays
+	// selectable, as before.
+	if err == nil && nirilayout.DimUnavailable() {
+		nirilayout.MarkUnavailable(layouts)
+	}
+
 	// Preselect the active layout. Detection works whether nirilayout.kdl is a
 	// symlink (classic setup) or a regular file (e.g. noctalia 5); if it can't
 	// be determined we just fall back to the first layout, never an error.

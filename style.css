@@ -24,3 +24,16 @@ button.current {
 button.selected {
 	border-color: #7dc4e4;
 }
+
+/* Layouts whose outputs are not all connected (-dim-unavailable). */
+button.unavailable {
+	opacity: 0.35;
+}
+
+button.unavailable:hover {
+	border-color: transparent;
+}
+
+label.missing-outputs {
+	font-size: smaller;
+}
