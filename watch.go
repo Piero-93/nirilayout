@@ -101,13 +101,7 @@ func pickSafeLayout(layouts []Layout, connected map[string]bool, fallback string
 		if len(l.Outputs) == 0 {
 			continue
 		}
-		allConnected := true
-		for _, o := range l.Outputs {
-			if !connected[o.Name] {
-				allConnected = false
-				break
-			}
-		}
+		allConnected := len(missingOutputs(l, connected)) == 0
 		if allConnected && len(l.Outputs) > best {
 			best = len(l.Outputs)
 			bestLayout = l

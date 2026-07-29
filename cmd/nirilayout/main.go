@@ -57,6 +57,14 @@ func main() {
 		return
 	}
 
+	// Layouts that need a monitor which is not plugged in can be dimmed or
+	// hidden, depending on the flags. Off by default: every layout stays
+	// selectable, as before. Must run before the current layout is located,
+	// since hiding renumbers the list.
+	if err == nil {
+		layouts = nirilayout.ApplyAvailability(layouts)
+	}
+
 	// Preselect the active layout. Detection works whether nirilayout.kdl is a
 	// symlink (classic setup) or a regular file (e.g. noctalia 5); if it can't
 	// be determined we just fall back to the first layout, never an error.
