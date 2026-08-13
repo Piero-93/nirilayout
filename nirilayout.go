@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/diamondburned/gotk4-layer-shell/pkg/gtk4layershell"
 	"github.com/diamondburned/gotk4/pkg/gdk/v4"
@@ -31,7 +32,15 @@ func loadStylesheet(content string) *gtk.CSSProvider {
 	return prov
 }
 
-func Run(app *gtk.Application, layouts []Layout, startIndex int, err error) {
+// LoadStyles installs the default stylesheet and the user's overrides. Every
+// mode that puts something on screen must call it: style.css hides windows
+// until they get the "visible" class, so a window shown without it is mapped
+// but invisible.
+//
+// It runs once per process. A second activation of an already-running instance
+// calls it again, and stacking another copy of the same providers on the
+// display would only cost work.
+var LoadStyles = sync.OnceFunc(func() {
 	// load default stylesheet
 	gtk.StyleContextAddProviderForDisplay(
 		gdk.DisplayGetDefault(), loadStylesheet(appStylesheet),
@@ -54,6 +63,10 @@ func Run(app *gtk.Application, layouts []Layout, startIndex int, err error) {
 			}
 		}
 	}
+})
+
+func Run(app *gtk.Application, layouts []Layout, startIndex int, err error) {
+	LoadStyles()
 
 	win := gtk.NewApplicationWindow(app)
 	win.SetTitle("nirilayout")
@@ -65,9 +78,16 @@ func Run(app *gtk.Application, layouts []Layout, startIndex int, err error) {
 	gtk4layershell.SetNamespace(&win.Window, "nirilayout")
 
 	root := gtk.NewBox(gtk.OrientationVertical, 16)
+	// The window is a transparent tray; this box is the visible panel, drawn
+	// with the same raised card look as the identify overlays.
+	root.AddCSSClass("card")
+	root.AddCSSClass("panel")
 	win.SetChild(root)
 
 	quit := func() {
+		// The overlays are separate windows; they must not outlive the picker
+		// that put them there.
+		DismissIdentify()
 		win.RemoveCSSClass("visible")
 		glib.TimeoutAdd(75, func() bool {
 			app.Quit()
@@ -200,7 +220,7 @@ func Run(app *gtk.Application, layouts []Layout, startIndex int, err error) {
 	label.SetSensitive(false)
 	label.SetMarginEnd(16)
 	inputBox.SetStartWidget(label)
-	label = gtk.NewLabel(T("Esc to quit"))
+	label = gtk.NewLabel(T("F1 to identify monitors · Esc to quit"))
 	label.SetSensitive(false)
 	label.SetMarginStart(16)
 	inputBox.SetEndWidget(label)
@@ -303,5 +323,37 @@ func Run(app *gtk.Application, layouts []Layout, startIndex int, err error) {
 	})
 	input.AddController(k)
 
+	// Identify is bound on the window rather than on the search box, in the
+	// capture phase, so it fires wherever the focus happens to be.
+	//
+	// F1 and Ctrl+I, never a bare "i": the controller above swallows the keys
+	// it handles, so binding the letter would make it impossible to type any
+	// layout name containing an "i".
+	ik := gtk.NewEventControllerKey()
+	ik.SetPropagationPhase(gtk.PhaseCapture)
+	ik.ConnectKeyPressed(func(keyval uint, keycode uint, state gdk.ModifierType) bool {
+		switch {
+		case keyval == gdk.KEY_F1,
+			(keyval == gdk.KEY_i || keyval == gdk.KEY_I) && state&gdk.ControlMask != 0:
+			ShowIdentify(app, false)
+			return true
+		case keyval == gdk.KEY_Escape:
+			// While the overlays are up, Esc puts them away; a second Esc
+			// closes the picker as before.
+			return DismissIdentify()
+		}
+		return false
+	})
+	win.AddController(ik)
+
 	win.SetVisible(true)
+
+	if IdentifyOnOpen() {
+		// Through an idle callback so the picker maps first and the overlays
+		// end up stacked on top of it.
+		glib.IdleAdd(func() bool {
+			ShowIdentify(app, false)
+			return false
+		})
+	}
 }

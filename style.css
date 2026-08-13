@@ -1,12 +1,31 @@
+/* The window is only a transparent tray. A drop shadow cannot spill past the
+   edge of its surface, so the window has to stay larger than the card drawn
+   inside it — hence the padding here and the background on .card below. */
 window {
 	opacity: 0;
-	padding: 16px;
-	border-radius: 8px;
+	padding: 14px;
+	background-color: transparent;
 	transition: opacity 75ms ease-in-out;
 }
 
 window.visible {
 	opacity: 1;
+}
+
+/* The raised surface everything is drawn on: a hairline border and a soft drop
+   shadow, so the panel reads as floating above the desktop rather than painted
+   flat onto it. Shared by the picker and the identify overlays so they look
+   like the same application. Theme colors rather than fixed ones, so it still
+   reads on a light theme. */
+box.card {
+	border-radius: 14px;
+	background-color: @theme_bg_color;
+	border: 1px solid alpha(@theme_fg_color, 0.14);
+	box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+box.panel {
+	padding: 16px;
 }
 
 button {
@@ -36,4 +55,20 @@ button.unavailable:hover {
 
 label.missing-outputs {
 	font-size: smaller;
+}
+
+/* Per-monitor overlays naming each screen (-identify, -identify-on-open, F1).
+   They sit in the top-left corner so they do not cover the picker. */
+box.identify-card {
+	padding: 14px 20px;
+}
+
+label.identify-name {
+	font-size: 30px;
+	font-weight: bold;
+}
+
+label.identify-details {
+	font-size: 13px;
+	opacity: 0.55;
 }

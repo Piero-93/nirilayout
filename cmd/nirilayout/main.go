@@ -34,6 +34,30 @@ func main() {
 	// Apply -lang and -lowercase now that flags are parsed.
 	nirilayout.InitI18n()
 
+	mode, err := nirilayout.ResolveMode()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+
+	// Identify mode is a one-shot overlay naming each monitor. It needs no
+	// layouts, so it runs before they are gathered rather than paying for a
+	// list nobody will see.
+	//
+	// It gets its own application id: the picker's is single-instance, so an
+	// identify launched while a picker is open would otherwise just tell the
+	// running instance to activate — reopening the picker, since flags are not
+	// forwarded. Staying unique under its own id means two rapid identifies
+	// dedupe into one, whose timer simply restarts.
+	if mode == nirilayout.ModeIdentify {
+		app := gtk.NewApplication("co.calebc.nirilayout.identify", gio.ApplicationDefaultFlags)
+		app.ConnectActivate(func() { nirilayout.RunIdentify(app) })
+		if code := app.Run(nil); code > 0 {
+			os.Exit(code)
+		}
+		return
+	}
+
 	var layouts []nirilayout.Layout
 
 	configDir, err := nirilayout.GetNiriConfigDir()
@@ -45,7 +69,7 @@ func main() {
 	// working output whenever the active one disappears (cable unplug or boot
 	// with no external monitor). It needs the layouts to recover to, so a
 	// gather error here is fatal rather than a fall-through to the picker.
-	if nirilayout.Watch() {
+	if mode == nirilayout.ModeWatch {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
