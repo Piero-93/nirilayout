@@ -169,6 +169,7 @@ Optionally, add a keybinding to spawn `nirilayout` to make it easier to switch.
 binds {
     // ...
     Mod+P { spawn "nirilayout"; } // Assuming nirilayout is on $PATH
+    Mod+Shift+I { spawn "nirilayout" "-identify"; } // Show each monitor's name
     // ...
 }
 ```
@@ -179,7 +180,8 @@ All done!
 
 Run `nirilayout` again (or use your keybinding) to switch between your layouts.
 
-In the switcher, you can select a layout with `←`/`→`/`Return` or the mouse. You
+In the switcher, you can select a layout with `←`/`→`/`Return` or the mouse, and
+press `F1` to see which monitor is which. You
 can also type the name of a layout or its shortcut to select it. Shortcuts and
 names are case-sensitive. As soon as you finish typing a shortcut, the switcher
 will immediately select that layout, so make sure your shortcuts are not
@@ -187,6 +189,44 @@ prefixes of each other.
 
 Layouts are presented in lexicographical order by name. If you want to change
 the order, you can rename the files in the config directory.
+
+### Identify your monitors
+
+Layout files name outputs by their connector — `eDP-1`, `HDMI-A-1`, `DP-2` —
+and with more than one monitor plugged in it is not obvious which name belongs
+to which screen. Identify mode puts a card in the top-left corner of every
+monitor for a few seconds — out of the way of the switcher, which is centered —
+showing exactly the name you would write in a `layout_<name>.kdl`, along with
+its resolution, refresh rate and scale:
+
+```
+        eDP-1
+   1920x1080@60  1×
+```
+
+There are three ways to bring it up:
+
+- press `F1` (or `Ctrl+I`) while the switcher is open — the switcher stays up
+  and keeps the keyboard, so you can go on picking a layout;
+- run `nirilayout -identify`, which shows the cards and exits — bind it to a
+  key in niri, see [Configure niri](#configure-niri);
+- pass `-identify-on-open` to show them every time the switcher opens. This is
+  off by default.
+
+The cards disappear on their own after three seconds. Use
+`-identify-duration` to change that (`-identify-duration 5s`,
+`-identify-duration 1500ms`); values are kept between 200ms and 30s. Clicking a
+card, or pressing `Esc`, dismisses them early — in the switcher, the first
+`Esc` closes the cards and the second closes the switcher.
+
+An output that is connected but turned off gets no card, because there is no
+screen to draw it on. If niri cannot be queried, the cards still appear with the
+numbers GTK reports; note that those are the logical size, already divided by
+the scale, rather than the mode.
+
+Style the cards with `window.identify`, `label.identify-name` and
+`label.identify-details` in your custom CSS. See
+[Configure custom CSS](#optional-configure-custom-css).
 
 ### Optional: Skip layouts you cannot use right now
 
@@ -281,6 +321,9 @@ safe to leave running alongside normal use of the GUI switcher.
 | `-hide-unavailable` | Leave those layouts out of the picker entirely. Takes precedence over `-dim-unavailable`. See [Skip layouts you cannot use right now](#optional-skip-layouts-you-cannot-use-right-now). |
 | `-watch`      | Run as a background daemon that recovers a black screen instead of showing the GUI. See [Automatic recovery](#automatic-recovery-watch-mode). |
 | `-fallback <name>` | In watch mode, the layout to apply when no output is active. See [Automatic recovery](#automatic-recovery-watch-mode). |
+| `-identify`   | Show a card on every connected monitor with its name, resolution and scale, then exit. See [Identify your monitors](#identify-your-monitors). |
+| `-identify-on-open` | Also show those cards whenever the switcher opens. See [Identify your monitors](#identify-your-monitors). |
+| `-identify-duration <dur>` | How long the cards stay on screen (default `3s`; accepts `1500ms`, `5s`, …). |
 
 Run `nirilayout -h` for the full list.
 

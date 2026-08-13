@@ -2,6 +2,7 @@ package nirilayout
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -28,22 +29,44 @@ const (
 	watchEventRetry = 1 * time.Second
 )
 
-// Watch reports whether -watch was passed. Consumed by main to run the daemon
-// instead of the GUI.
-func Watch() bool { return *watchFlag }
-
 // niriOutput is the subset of a `niri msg -j outputs` entry we care about. The
 // command returns a JSON object keyed by connector name; an output is active
 // (drawing a picture) exactly when its "logical" region is non-null. A
 // connected-but-off output appears with logical == null; a disconnected output
 // is absent from the map entirely.
 type niriOutput struct {
-	Logical *json.RawMessage `json:"logical"`
+	Logical     *niriLogical `json:"logical"`
+	Modes       []niriMode   `json:"modes"`
+	CurrentMode *int         `json:"current_mode"`
 }
+
+// niriLogical is an output's placement in the logical coordinate space. Only
+// its presence matters for watch mode; the scale is what the identify overlay
+// reports, since it is the number the user writes in their layout file.
+type niriLogical struct {
+	Scale float64 `json:"scale"`
+}
+
+// niriMode is one entry of an output's mode list, in physical pixels.
+// CurrentMode indexes into it, and is null for an output that is off.
+// RefreshRate is in milli-Hertz: 60049 means 60.049 Hz.
+type niriMode struct {
+	Width       int `json:"width"`
+	Height      int `json:"height"`
+	RefreshRate int `json:"refresh_rate"`
+}
+
+// niriQueryTimeout bounds a `niri msg` call. Without it a wedged niri socket
+// would hang the caller forever — fatal for the identify overlay, which must
+// always reach the point where it can tear itself back down.
+const niriQueryTimeout = 2 * time.Second
 
 // niriOutputs queries niri for the current output state.
 func niriOutputs() (map[string]niriOutput, error) {
-	out, err := exec.Command("niri", "msg", "-j", "outputs").Output()
+	ctx, cancel := context.WithTimeout(context.Background(), niriQueryTimeout)
+	defer cancel()
+
+	out, err := exec.CommandContext(ctx, "niri", "msg", "-j", "outputs").Output()
 	if err != nil {
 		return nil, fmt.Errorf("niri msg outputs: %w", err)
 	}
