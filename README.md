@@ -1,5 +1,10 @@
 # nirilayout
 
+[![AUR version](https://img.shields.io/aur/version/nirilayout)](https://aur.archlinux.org/packages/nirilayout)
+[![AUR git version](https://img.shields.io/aur/version/nirilayout-git?label=aur%20%28git%29)](https://aur.archlinux.org/packages/nirilayout-git)
+[![Latest release](https://img.shields.io/github/v/release/Piero-93/nirilayout)](https://github.com/Piero-93/nirilayout/releases/latest)
+[![License](https://img.shields.io/github/license/Piero-93/nirilayout)](LICENSE)
+
 nirilayout is a simple tool to quickly switch your
 [niri](https://github.com/YaLTeR/niri) output configuration between different
 layouts. Especially useful for laptop users who move between different setups
