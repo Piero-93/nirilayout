@@ -26,7 +26,7 @@ func main() {
 		})
 		flag.PrintDefaults()
 		fmt.Print(nirilayout.T("\nTo use nirilayout, create layouts in files called ~/.config/niri/layout_<name>.kdl and run nirilayout.\nSee the README for more details:\n"))
-		fmt.Print("  https://github.com/calico32/nirilayout/blob/main/README.md\n")
+		fmt.Print("  https://github.com/Piero-93/nirilayout/blob/main/README.md\n")
 	}
 
 	flag.Parse()

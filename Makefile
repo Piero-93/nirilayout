@@ -21,7 +21,7 @@ pot: $(POT)
 $(POT): $(I18N_SRCS)
 	xgettext --language=C --from-code=UTF-8 --keyword=T:1 --keyword=Tf:1 --keyword=N:1 \
 		--package-name=nirilayout \
-		--msgid-bugs-address="https://github.com/calico32/nirilayout/issues" \
+		--msgid-bugs-address="https://github.com/Piero-93/nirilayout/issues" \
 		--copyright-holder="nirilayout contributors" \
 		-o $@ $(I18N_SRCS)
 
