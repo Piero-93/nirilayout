@@ -5,6 +5,14 @@ nirilayout is a simple tool to quickly switch your
 layouts. Especially useful for laptop users who move between different setups
 frequently.
 
+> [!NOTE]
+> This is a fork of [calico32/nirilayout](https://github.com/calico32/nirilayout)
+> by Caleb Chan. The original repo hasn't been updated in a while, so I'm
+> keeping it going here. Compared to the original it adds
+> [watch mode](#automatic-recovery-watch-mode),
+> [monitor identification](#identify-your-monitors) and
+> [translations](#localization).
+
 ![nirilayout screenshot](screenshot.png)
 
 nirilayout works by keeping the `output` blocks for each user-defined layout in
@@ -20,8 +28,17 @@ customize the switcher and the previews.
 
 ### Install nirilayout
 
+**On Arch Linux?** Install it from the AUR:
+[`nirilayout`](https://aur.archlinux.org/packages/nirilayout) for the latest
+release, or [`nirilayout-git`](https://aur.archlinux.org/packages/nirilayout-git)
+to follow `main`.
+
+```sh
+yay -S nirilayout
+```
+
 **On Linux x86_64?** Download the latest precompiled binary from the
-[releases page](https://github.com/calico32/nirilayout/releases). Add it to your
+[releases page](https://github.com/Piero-93/nirilayout/releases). Add it to your
 path and you're good to go!
 
 Otherwise, to build from source, install Go 1.25+, GTK 4.16+ and [GTK4 Layer
@@ -413,4 +430,5 @@ open an issue or a pull request. Translations are especially welcome — see
 # License
 
 nirilayout is licensed under the MIT license. See [LICENSE](LICENSE) for more
-information.
+information. Originally written by Caleb Chan
+([calico32/nirilayout](https://github.com/calico32/nirilayout)).

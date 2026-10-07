@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: nirilayout\n"
-"Report-Msgid-Bugs-To: https://github.com/calico32/nirilayout/issues\n"
+"Report-Msgid-Bugs-To: https://github.com/Piero-93/nirilayout/issues\n"
 "POT-Creation-Date: 2026-08-13 13:04+0200\n"
 "PO-Revision-Date: 2026-06-13 21:00+0200\n"
 "Last-Translator: nirilayout contributors\n"
